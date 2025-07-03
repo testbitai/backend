@@ -662,6 +662,63 @@ class TestService {
       overallImprovement = currScore - prevScore;
     }
 
+    const attemptMap = new Map<string, AttemptedQuestion>();
+    for (const attempt of testResult.attemptedQuestions) {
+      const key = `${attempt.sectionIndex}-${attempt.questionIndex}`;
+      attemptMap.set(key, attempt);
+    }
+
+    const questionsData: any[] = [];
+    let questionId = 1;
+
+    for (
+      let sectionIndex = 0;
+      sectionIndex < test.sections.length;
+      sectionIndex++
+    ) {
+      const section = test.sections[sectionIndex];
+
+      for (
+        let questionIndex = 0;
+        questionIndex < section.questions.length;
+        questionIndex++
+      ) {
+        const question = section.questions[questionIndex];
+        const key = `${sectionIndex}-${questionIndex}`;
+        const attempt = attemptMap.get(key);
+
+        const options = ["A", "B", "C", "D"];
+        const correctAnswerIndex =
+          options?.indexOf(question.correctAnswer) ?? -1;
+
+        let userAnswerIndex: number | null = null;
+
+        if (attempt) {
+          // If selectedAnswer is a letter, convert to index
+          const idx = options.indexOf(attempt.selectedAnswer);
+          userAnswerIndex = idx >= 0 ? idx : null;
+        }
+
+        questionsData.push({
+          id: questionId++,
+          subject: section.subject,
+          question: question.questionText,
+          options: question.options,
+          correctAnswer: correctAnswerIndex >= 0 ? correctAnswerIndex : null,
+          userAnswer: attempt ? userAnswerIndex : null,
+          explanation: question.explanation || "",
+          timeSpent: attempt?.timeTaken ?? 0,
+          difficulty: question.difficulty,
+          status: attempt
+            ? attempt.selectedAnswer == null
+              ? "skipped"
+              : attempt.isCorrect
+              ? "correct"
+              : "incorrect"
+            : "skipped",
+        });
+      }
+    }
     return {
       _id: testResult._id,
       scorePercent: testResult.scorePercent,
@@ -693,6 +750,7 @@ class TestService {
         isPurchased: test.isPurchased,
       },
       attemptedQuestions: testResult.attemptedQuestions,
+      questionsData,
       subjectAnalytics: subjectAnalyticsDetailed,
       sectionAnalytics,
       slowestQuestions: testResult.slowestQuestions,
