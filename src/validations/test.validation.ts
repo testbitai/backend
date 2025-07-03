@@ -5,33 +5,40 @@ const createTest = Joi.object({
   body: Joi.object({
     title: Joi.string().required(),
     description: Joi.string().optional(),
-    duration: Joi.number().optional(),
+    duration: Joi.number().required(),
     examType: Joi.string()
       .valid(...Object.values(ExamType))
-      .required(),
-    subject: Joi.string()
-      .valid(...Object.values(Subject))
       .required(),
     type: Joi.string()
       .valid(...Object.values(TestType))
       .required(),
-    difficulty: Joi.string().valid("Easy", "Medium", "Hard").required(),
-    questions: Joi.array()
+    sections: Joi.array()
       .items(
         Joi.object({
-          questionText: Joi.string().required(),
-          options: Joi.array()
-            .items(Joi.string().required())
-            .length(4)
+          subject: Joi.string()
+            .valid(...Object.values(Subject))
             .required(),
-          correctAnswer: Joi.string().required(),
-          explanation: Joi.string().allow("").optional(),
+          questions: Joi.array()
+            .items(
+              Joi.object({
+                questionText: Joi.string().required(),
+                options: Joi.array().items(Joi.string()).length(4).required(),
+                correctAnswer: Joi.string().required(),
+                explanation: Joi.string().allow("").optional(),
+                difficulty: Joi.string()
+                  .valid("Easy", "Medium", "Hard")
+                  .required(),
+              })
+            )
+            .min(1)
+            .required(),
         })
       )
       .min(1)
       .required(),
   }),
 });
+
 
 const editTest = Joi.object({
   body: Joi.object({
@@ -63,14 +70,21 @@ const editTest = Joi.object({
   }),
 });
 
-const submitTest = Joi.object({
+export const submitTest = Joi.object({
   body: Joi.object({
     attemptedQuestions: Joi.array()
       .items(
         Joi.object({
-          questionId: Joi.number().required(),
-          selectedAnswer: Joi.string().required(),
+          sectionIndex: Joi.number().integer().min(0).required(),
+          questionIndex: Joi.number().integer().min(0).required(),
+          selectedAnswer: Joi.string()
+            .valid("A", "B", "C", "D")
+            .required(),
           timeTaken: Joi.number().min(0).required(),
+           answerHistory: Joi.array()
+            .items(Joi.string().valid("A", "B", "C", "D"))
+            .min(1)
+            .optional(),
         })
       )
       .required(),

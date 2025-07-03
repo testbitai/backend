@@ -18,39 +18,60 @@ export enum Subject {
   MATH = "Math",
 }
 
+// Question Interface
 export interface Question {
   questionText: string;
   options: string[];
   correctAnswer: string;
   explanation?: string;
+  difficulty: "Easy" | "Medium" | "Hard";
 }
 
+// Section Interface
+export interface Section {
+  subject: Subject;
+  questions: Question[];
+}
+
+// Test Interface
 export interface TestDocument extends Document {
   title: string;
   description?: string;
   examType: ExamType;
-  subject: Subject;
   type: TestType;
-  difficulty: "Easy" | "Medium" | "Hard";
-  questions: Question[];
+  sections: Section[];
+  duration: number;
   createdBy: mongoose.Types.ObjectId;
   isPublished: boolean;
   isPurchased: boolean;
-  duration: Number;
   createdByRole: "admin" | "tutor";
   allowedStudents: mongoose.Types.ObjectId[];
   createdAt: Date;
   updatedAt: Date;
 }
-
 const questionSchema = new Schema<Question>(
   {
     questionText: { type: String, required: true },
     options: [{ type: String, required: true }],
     correctAnswer: { type: String, required: true },
-    explanation: {
-      type: String
-    }
+    explanation: { type: String },
+    difficulty: {
+      type: String,
+      enum: ["Easy", "Medium", "Hard"],
+      required: true,
+    },
+  },
+  { _id: false }
+);
+
+const sectionSchema = new Schema<Section>(
+  {
+    subject: {
+      type: String,
+      enum: Object.values(Subject),
+      required: true,
+    },
+    questions: [questionSchema],
   },
   { _id: false }
 );
@@ -59,16 +80,18 @@ const testSchema = new Schema<TestDocument>(
   {
     title: { type: String, required: true },
     description: { type: String },
-    examType: { type: String, enum: Object.values(ExamType), required: true },
-    subject: { type: String, enum: Object.values(Subject), required: true },
-    type: { type: String, enum: Object.values(TestType), required: true },
-    difficulty: {
+    examType: {
       type: String,
-      enum: ["Easy", "Medium", "Hard"],
+      enum: Object.values(ExamType),
       required: true,
     },
-    questions: [questionSchema],
-    duration: Number,
+    type: {
+      type: String,
+      enum: Object.values(TestType),
+      required: true,
+    },
+    sections: [sectionSchema],
+    duration: { type: Number, required: true },
     createdBy: { type: Schema.Types.ObjectId, ref: "User", required: true },
     isPublished: { type: Boolean, default: false },
     isPurchased: { type: Boolean, default: false },
@@ -85,6 +108,7 @@ const testSchema = new Schema<TestDocument>(
     },
   }
 );
+
 
 const TestModel: Model<TestDocument> = mongoose.model<TestDocument>(
   "Test",

@@ -1,6 +1,10 @@
 import { RequestUser, RequestWithUser } from "../interfaces/request.interface";
 import TestModel from "../models/test.model";
-import TestAttemptModel from "../models/testAttempt.model";
+import TestAttemptModel, {
+  AttemptedQuestion,
+  SectionAnalytics,
+  SubjectAnalytics,
+} from "../models/testAttempt.model";
 import User, { UserDocument } from "../models/user.model";
 import { ApiError } from "../utils/apiError";
 import httpStatus from "http-status";
@@ -8,16 +12,7 @@ import mongoose from "mongoose";
 
 class TestService {
   public createTest = async (user: RequestUser, data: any) => {
-    const {
-      title,
-      description,
-      examType,
-      subject,
-      type,
-      difficulty,
-      questions,
-      duration,
-    } = data;
+    const { title, description, examType, type, sections, duration } = data;
 
     let allowedStudents: mongoose.Types.ObjectId[] = [];
 
@@ -35,10 +30,8 @@ class TestService {
       title,
       description,
       examType,
-      subject,
       type,
-      difficulty,
-      questions,
+      sections,
       duration,
       createdBy: user._id,
       createdByRole: user.role,
@@ -96,36 +89,89 @@ class TestService {
         { createdByRole: "admin" },
         { createdByRole: "tutor", allowedStudents: user._id },
       ];
-    }
-
-    if (query.subject) {
-      filter.subject = query.subject;
+    } else {
+      // For admin and tutor, fetch only tests created by them
+      filter.createdBy = user._id;
+      filter.createdByRole = user.role;
     }
 
     if (query.type) {
       filter.type = query.type;
     }
 
-    if (query.difficulty) {
-      filter.difficulty = query.difficulty;
+    if (query.examType) {
+      filter.examType = query.examType;
     }
 
-    // Only select the length of questions array, not the questions themselves
     const tests = await TestModel.find(filter).select(
-      "title subject type examType difficulty createdByRole questions"
+      "title type examType createdByRole sections duration"
     );
 
-    // Add numberOfQuestions field and remove questions field
-    const testsWithCount = tests.map((test) => {
+    let filteredTests = tests;
+
+    if (query.subject) {
+      filteredTests = filteredTests.filter((test) =>
+        test.sections?.some((section) => section.subject === query.subject)
+      );
+    }
+
+    if (query.difficulty) {
+      filteredTests = filteredTests.filter((test) =>
+        test.sections?.some((section) =>
+          section.questions?.some((q) => q.difficulty === query.difficulty)
+        )
+      );
+    }
+
+    const testsWithCount = filteredTests.map((test) => {
       const testObj = test.toObject();
-      const numberOfQuestions = testObj.questions
-        ? testObj.questions.length
-        : 0;
-      // Remove questions field
-      delete (testObj as { questions?: any }).questions;
+
+      let numberOfQuestions = 0;
+      const difficultyCount: Record<string, number> = {
+        Easy: 0,
+        Medium: 0,
+        Hard: 0,
+      };
+
+      if (testObj.sections) {
+        for (const section of testObj.sections) {
+          if (section.questions) {
+            numberOfQuestions += section.questions.length;
+
+            for (const question of section.questions) {
+              if (question.difficulty) {
+                difficultyCount[question.difficulty] =
+                  (difficultyCount[question.difficulty] || 0) + 1;
+              }
+            }
+          }
+        }
+      }
+
+      let overallDifficulty = "Mixed";
+
+      if (numberOfQuestions > 0) {
+        const maxCount = Math.max(
+          difficultyCount.Easy,
+          difficultyCount.Medium,
+          difficultyCount.Hard
+        );
+
+        const entries = Object.entries(difficultyCount).filter(
+          ([, count]) => count === maxCount
+        );
+
+        if (entries.length === 1) {
+          overallDifficulty = entries[0][0];
+        }
+      }
+
+      delete (testObj as { sections?: any }).sections;
+
       return {
         ...testObj,
         numberOfQuestions,
+        overallDifficulty,
       };
     });
 
@@ -139,37 +185,7 @@ class TestService {
       throw new ApiError(httpStatus.NOT_FOUND, "Test not found");
     }
 
-    if (test.createdByRole === "tutor") {
-      if (
-        user.role !== "student" ||
-        !test.allowedStudents?.includes(new mongoose.Types.ObjectId(user?._id))
-      ) {
-        throw new ApiError(
-          httpStatus.FORBIDDEN,
-          "You do not have access to this test"
-        );
-      }
-    }
-
-    // Convert to object and remove correctAnswer and explanation from each question
-    // const testObj = test.toObject();
-    // if (Array.isArray(testObj.questions)) {
-    //   testObj.questions = testObj.questions.map((q: any) => {
-    //     const { correctAnswer, explanation, ...rest } = q;
-    //     return rest;
-    //   });
-    // }
-
-    return test;
-  };
-
-  public submitTest = async (user: RequestUser, testId: string, data: any) => {
-    const test = await TestModel.findById(testId);
-
-    if (!test) {
-      throw new ApiError(httpStatus.NOT_FOUND, "Test not found");
-    }
-
+    // Tutor access control
     if (test.createdByRole === "tutor") {
       if (
         user.role !== "student" ||
@@ -182,34 +198,280 @@ class TestService {
       }
     }
 
-    const { attemptedQuestions } = data;
+    const testObj = test.toObject();
+
+    let flatQuestions: any[] = [];
+    let numberOfQuestions = 0;
+    const difficultyCount: Record<string, number> = {
+      Easy: 0,
+      Medium: 0,
+      Hard: 0,
+    };
+
+    if (Array.isArray(testObj.sections)) {
+      for (
+        let sectionIndex = 0;
+        sectionIndex < testObj.sections.length;
+        sectionIndex++
+      ) {
+        const section = testObj.sections[sectionIndex];
+        const subject = section.subject;
+
+        if (Array.isArray(section.questions)) {
+          for (
+            let questionIndex = 0;
+            questionIndex < section.questions.length;
+            questionIndex++
+          ) {
+            const question = section.questions[questionIndex];
+            const { correctAnswer, explanation, ...rest } = question;
+
+            // Track difficulty
+            if (question.difficulty) {
+              difficultyCount[question.difficulty] =
+                (difficultyCount[question.difficulty] || 0) + 1;
+            }
+
+            numberOfQuestions++;
+
+            flatQuestions.push({
+              ...rest,
+              sectionIndex,
+              questionIndex,
+              section: subject,
+            });
+          }
+        }
+      }
+    }
+
+    // Calculate overall difficulty
+    let overallDifficulty = "Mixed";
+    if (numberOfQuestions > 0) {
+      const maxCount = Math.max(
+        difficultyCount.Easy,
+        difficultyCount.Medium,
+        difficultyCount.Hard
+      );
+      const entries = Object.entries(difficultyCount).filter(
+        ([, count]) => count === maxCount
+      );
+      if (entries.length === 1) {
+        overallDifficulty = entries[0][0];
+      }
+    }
+
+    // Final payload adjustments
+    delete (testObj as { sections?: any }).sections;
+    (testObj as any).questions = flatQuestions;
+    (testObj as any).overallDifficulty = overallDifficulty;
+    (testObj as any).numberOfQuestions = numberOfQuestions;
+
+    return testObj;
+  };
+
+  public submitTest = async (
+    user: RequestUser,
+    testId: string,
+    data: {
+      attemptedQuestions: {
+        sectionIndex: number;
+        questionIndex: number;
+        selectedAnswer: string;
+        timeTaken: number;
+        answerHistory?: string[];
+      }[];
+    }
+  ) => {
+    const test = await TestModel.findById(testId);
+    if (!test) {
+      throw new ApiError(httpStatus.NOT_FOUND, "Test not found");
+    }
+
+    // Check access if test is from tutor
+    if (test.createdByRole === "tutor") {
+      const allowed = test.allowedStudents?.some(
+        (id) => id.toString() === user._id.toString()
+      );
+      if (!allowed) {
+        throw new ApiError(
+          httpStatus.FORBIDDEN,
+          "You do not have access to this test"
+        );
+      }
+    }
+
+    let totalQuestions = 0;
+    for (const section of test.sections) {
+      totalQuestions += section.questions.length;
+    }
 
     let correctCount = 0;
-    let totalQuestions = test.questions.length;
+    let totalTimeTaken = 0;
+    let changedAnswersCount = 0;
+    let changedCorrectCount = 0;
 
-    const detailedAttempt = attemptedQuestions.map((attempt: any) => {
-      const q = test.questions[attempt.questionId];
-      const isCorrect = q.correctAnswer === attempt.selectedAnswer;
+    const perSection: Record<number, SectionAnalytics> = {};
+    const perSubject: Record<string, SubjectAnalytics> = {};
+    const detailedAttempt: AttemptedQuestion[] = [];
+
+    for (const attempt of data.attemptedQuestions) {
+      const {
+        sectionIndex,
+        questionIndex,
+        selectedAnswer,
+        timeTaken,
+        answerHistory = [],
+      } = attempt;
+
+      const section = test.sections[sectionIndex];
+      if (!section) {
+        throw new ApiError(
+          httpStatus.BAD_REQUEST,
+          `Invalid sectionIndex: ${sectionIndex}`
+        );
+      }
+
+      const question = section.questions[questionIndex];
+      if (!question) {
+        throw new ApiError(
+          httpStatus.BAD_REQUEST,
+          `Invalid questionIndex ${questionIndex} in section ${sectionIndex}`
+        );
+      }
+
+      const subject = section.subject;
+      const isCorrect = question.correctAnswer === selectedAnswer;
+
       if (isCorrect) correctCount++;
-      return {
-        questionId: attempt.questionId,
-        selectedAnswer: attempt.selectedAnswer,
-        isCorrect,
-        timeTaken: attempt.timeTaken,
-      };
-    });
+      totalTimeTaken += timeTaken;
 
-    const incorrectCount = totalQuestions - correctCount;
-    const scorePercent = (correctCount / totalQuestions) * 100;
+      if (answerHistory.length > 1) {
+        changedAnswersCount++;
+        if (isCorrect) {
+          changedCorrectCount++;
+        }
+      }
+
+      // Save to detailed attempts
+      detailedAttempt.push({
+        sectionIndex,
+        questionIndex,
+        selectedAnswer,
+        answerHistory,
+        isCorrect,
+        timeTaken,
+      });
+
+      // Section Analytics
+      if (!perSection[sectionIndex]) {
+        perSection[sectionIndex] = {
+          sectionIndex,
+          subject,
+          correct: 0,
+          total: 0,
+          avgTime: 0,
+          accuracy: 0,
+        };
+      }
+      perSection[sectionIndex].total++;
+      if (isCorrect) perSection[sectionIndex].correct++;
+      perSection[sectionIndex].avgTime += timeTaken;
+
+      // Subject Analytics
+      if (!perSubject[subject]) {
+        perSubject[subject] = {
+          subject,
+          correct: 0,
+          total: 0,
+          avgTime: 0,
+          accuracy: 0,
+        };
+      }
+      perSubject[subject].total++;
+      if (isCorrect) perSubject[subject].correct++;
+      perSubject[subject].avgTime += timeTaken;
+    }
+
+    // Compute averages
+    const sectionAnalytics: SectionAnalytics[] = Object.values(perSection).map(
+      (sec) => ({
+        ...sec,
+        avgTime: sec.total > 0 ? sec.avgTime / sec.total : 0,
+        accuracy: sec.total > 0 ? (sec.correct / sec.total) * 100 : 0,
+      })
+    );
+
+    const subjectAnalytics: SubjectAnalytics[] = Object.values(perSubject).map(
+      (subj) => ({
+        ...subj,
+        avgTime: subj.total > 0 ? subj.avgTime / subj.total : 0,
+        accuracy: subj.total > 0 ? (subj.correct / subj.total) * 100 : 0,
+      })
+    );
+
+    // incorrectCount should be the number of attempted but wrong answers
+    const incorrectCount = detailedAttempt.filter(
+      (a) =>
+        a.selectedAnswer !== undefined &&
+        a.selectedAnswer !== null &&
+        a.selectedAnswer !== "" &&
+        !a.isCorrect
+    ).length;
+    // Calculate score: +4 for correct, -1 for wrong, 0 for skipped
+    let score = 0;
+    let attemptedCount = 0;
+    for (const attempt of detailedAttempt) {
+      if (
+        attempt.selectedAnswer === undefined ||
+        attempt.selectedAnswer === null ||
+        attempt.selectedAnswer === ""
+      ) {
+        // skipped
+        continue;
+      }
+      attemptedCount++;
+      if (attempt.isCorrect) {
+        score += 4;
+      } else {
+        score -= 1;
+      }
+    }
+
+    const scorePercent =
+      totalQuestions > 0 ? (score / (totalQuestions * 4)) * 100 : 0;
+
+    // Get slowest 5 questions
+    const slowestQuestions = [...detailedAttempt]
+      .sort((a, b) => b.timeTaken - a.timeTaken)
+      .slice(0, 5);
+    // Get fastest 5 questions (excluding skipped)
+    const fastestQuestions = [...detailedAttempt]
+      .filter(
+        (a) =>
+          a.selectedAnswer !== undefined &&
+          a.selectedAnswer !== null &&
+          a.selectedAnswer !== ""
+      )
+      .sort((a, b) => a.timeTaken - b.timeTaken)
+      .slice(0, 5);
 
     const testAttempt = await TestAttemptModel.create({
       user: user._id,
       test: test._id,
       scorePercent,
+      score,
       totalQuestions,
       correctCount,
       incorrectCount,
+      totalTimeTaken,
       attemptedQuestions: detailedAttempt,
+      sectionAnalytics,
+      subjectAnalytics,
+      slowestQuestions,
+      fastestQuestions,
+      changedAnswersCount,
+      changedCorrectCount,
     });
 
     return testAttempt;
@@ -224,16 +486,223 @@ class TestService {
   };
 
   public async getTestResultForTest(userId: string, testId: string) {
-    const testResult = await TestAttemptModel.findOne({
+    const testAttempts = await TestAttemptModel.find({
       user: userId,
       test: testId,
-    }).populate("test");
+    })
+      .sort({ attemptedAt: 1 }) // oldest first
+      .populate("test");
 
-    if (!testResult) {
+    if (testAttempts.length === 0) {
       throw new ApiError(httpStatus.NOT_FOUND, "Test result not found");
     }
 
-    return testResult;
+    const testResult = testAttempts[testAttempts.length - 1]; // latest attempt
+    const test = testResult.test as any;
+
+    // Flatten subject analytics
+    const subjectAnalytics =
+      testResult.subjectAnalytics?.map((s) => ({
+        subject: s.subject,
+        correct: s.correct,
+        total: s.total,
+        avgTime: s.avgTime,
+        accuracy: s.accuracy,
+      })) || [];
+
+    // Flatten section analytics
+    const sectionAnalytics =
+      testResult.sectionAnalytics?.map((s) => ({
+        sectionIndex: s.sectionIndex,
+        subject: s.subject,
+        correct: s.correct,
+        total: s.total,
+        avgTime: s.avgTime,
+        accuracy: s.accuracy,
+      })) || [];
+
+    // Build time distribution
+    const timeDistribution = [
+      {
+        name: "Under 30s",
+        value: testResult.attemptedQuestions.filter((q) => q.timeTaken < 30)
+          .length,
+      },
+      {
+        name: "30s - 1m",
+        value: testResult.attemptedQuestions.filter(
+          (q) => q.timeTaken >= 30 && q.timeTaken < 60
+        ).length,
+      },
+      {
+        name: "1m - 2m",
+        value: testResult.attemptedQuestions.filter(
+          (q) => q.timeTaken >= 60 && q.timeTaken < 120
+        ).length,
+      },
+      {
+        name: "Over 2m",
+        value: testResult.attemptedQuestions.filter((q) => q.timeTaken >= 120)
+          .length,
+      },
+    ];
+
+    // ------------------------
+    // Changed answers analysis
+    // ------------------------
+
+    let changedAnswersCount = 0;
+    let changedAndCorrectCount = 0;
+
+    for (const q of testResult.attemptedQuestions) {
+      if (q.answerHistory && q.answerHistory.length > 1) {
+        changedAnswersCount++;
+        if (q.isCorrect) {
+          changedAndCorrectCount++;
+        }
+      }
+    }
+
+    const totalQuestions = testResult.totalQuestions;
+    const correctCount = testResult.correctCount;
+    const incorrectCount = testResult.incorrectCount;
+    const skippedCount = totalQuestions - correctCount - incorrectCount;
+
+    // ------------------------
+    // Previous Attempts
+    // ------------------------
+
+    let previousAttemptsSummary: any[] = [];
+    let improvementsBySubject: Record<string, number> = {};
+
+    if (testAttempts.length > 1) {
+      const previousAttempts = testAttempts.slice(0, testAttempts.length - 1);
+
+      // Build summary table
+      previousAttemptsSummary = previousAttempts.map((attempt, idx) => ({
+        attemptNumber: idx + 1,
+        date: attempt.attemptedAt,
+        scorePercent: attempt.scorePercent,
+        correctCount: attempt.correctCount,
+        totalQuestions: attempt.totalQuestions,
+        timeTaken: attempt.totalTimeTaken,
+      }));
+
+      // Compare subject-wise analytics
+      const lastAttempt = previousAttempts[previousAttempts.length - 1];
+
+      for (const current of subjectAnalytics) {
+        const prev = lastAttempt.subjectAnalytics?.find(
+          (s: any) => s.subject === current.subject
+        );
+
+        if (prev) {
+          const improvement = current.accuracy - prev.accuracy;
+          improvementsBySubject[current.subject] = improvement;
+        }
+      }
+    }
+
+    // Add improvement info to subject analytics
+    const subjectAnalyticsDetailed = subjectAnalytics.map((subj) => {
+      const difficulty =
+        test.sections?.find((s: any) => s.subject === subj.subject)
+          ?.difficulty || "Unknown";
+
+      const improvement = improvementsBySubject[subj.subject] || 0;
+
+      return {
+        ...subj,
+        difficulty,
+        improvement,
+      };
+    });
+
+    // ------------------------
+    // Recommendations
+    // ------------------------
+
+    const weaknesses: string[] = [];
+    const strengths: string[] = [];
+
+    for (const subj of subjectAnalyticsDetailed) {
+      if (subj.accuracy < 70) {
+        weaknesses.push(subj.subject);
+      } else if (subj.accuracy > 85) {
+        strengths.push(subj.subject);
+      }
+    }
+
+    const recommendations: string[] = [];
+
+    if (weaknesses.length > 0) {
+      for (const w of weaknesses) {
+        recommendations.push(
+          `${w}: Consider practicing more problems, focusing on accuracy and time management.`
+        );
+      }
+    }
+
+    if (strengths.length > 0) {
+      for (const s of strengths) {
+        recommendations.push(
+          `${s}: Excellent performance! Keep practicing to maintain your strength.`
+        );
+      }
+    }
+
+    // Compute overall improvement vs previous attempt
+    let overallImprovement = null;
+
+    if (previousAttemptsSummary.length > 0) {
+      const prevScore =
+        previousAttemptsSummary[previousAttemptsSummary.length - 1]
+          .scorePercent;
+      const currScore = testResult.scorePercent;
+      overallImprovement = currScore - prevScore;
+    }
+
+    return {
+      _id: testResult._id,
+      scorePercent: testResult.scorePercent,
+      totalQuestions,
+      correctCount,
+      incorrectCount,
+      skippedCount,
+      score: testResult.score,
+      totalTimeTaken: testResult.totalTimeTaken,
+      attemptedAt: testResult.attemptedAt,
+      changedAnswers: {
+        totalChanged: changedAnswersCount,
+        correctAfterChange: changedAndCorrectCount,
+      },
+      test: {
+        _id: test._id,
+        title: test.title,
+        description: test.description,
+        examType: test.examType,
+        type: test.type,
+        duration: test.duration,
+        sections: test.sections?.map((section: any) => ({
+          subject: section.subject,
+          totalQuestions: section.questions?.length || 0,
+          difficulty: section.difficulty,
+        })),
+        createdBy: test.createdBy,
+        isPublished: test.isPublished,
+        isPurchased: test.isPurchased,
+      },
+      attemptedQuestions: testResult.attemptedQuestions,
+      subjectAnalytics: subjectAnalyticsDetailed,
+      sectionAnalytics,
+      slowestQuestions: testResult.slowestQuestions,
+      questionAnalysis: {
+        timeDistribution,
+      },
+      personalizedRecommendations: recommendations,
+      previousAttempts: previousAttemptsSummary,
+      overallImprovement,
+    };
   }
 }
 
