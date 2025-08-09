@@ -82,47 +82,96 @@ class TestService {
   };
 
   public getTests = async (user: RequestUser, query: any) => {
+    const {
+      page = 1,
+      limit = 10,
+      search = '',
+      type,
+      examType,
+      subject,
+      difficulty,
+      sortBy = 'createdAt',
+      sortOrder = 'desc',
+      createdByRole
+    } = query;
+
+    // Base filter
     const filter: any = { isPublished: true };
 
+    // Role-based filtering
     if (user.role === "student") {
       filter.$or = [
         { createdByRole: "admin" },
         { createdByRole: "tutor", allowedStudents: user._id },
       ];
+    } else if (user.role === "admin") {
+      // Admin can see all tests, optionally filter by creator role
+      if (createdByRole && createdByRole !== 'all') {
+        filter.createdByRole = createdByRole;
+      }
     } else {
-      // For admin and tutor, fetch only tests created by them
+      // For tutor, fetch only tests created by them
       filter.createdBy = user._id;
       filter.createdByRole = user.role;
     }
 
-    if (query.type) {
-      filter.type = query.type;
+    // Search functionality
+    if (search) {
+      filter.$or = [
+        { title: { $regex: search, $options: 'i' } },
+        { description: { $regex: search, $options: 'i' } },
+        { examType: { $regex: search, $options: 'i' } }
+      ];
     }
 
-    if (query.examType) {
-      filter.examType = query.examType;
+    // Type filter
+    if (type && type !== 'all') {
+      filter.type = type;
     }
 
-    const tests = await TestModel.find(filter).select(
-      "title type examType createdByRole sections duration"
-    );
+    // Exam type filter
+    if (examType && examType !== 'all') {
+      filter.examType = examType;
+    }
 
+    // Calculate pagination
+    const pageNumber = parseInt(page as string, 10);
+    const limitNumber = parseInt(limit as string, 10);
+    const skip = (pageNumber - 1) * limitNumber;
+
+    // Sort configuration
+    const sortConfig: any = {};
+    sortConfig[sortBy] = sortOrder === 'desc' ? -1 : 1;
+
+    // Execute query with pagination
+    const [tests, totalCount] = await Promise.all([
+      TestModel.find(filter)
+        .select("title description type examType createdByRole sections duration createdAt createdBy")
+        .populate('createdBy', 'name email')
+        .sort(sortConfig)
+        .skip(skip)
+        .limit(limitNumber),
+      TestModel.countDocuments(filter)
+    ]);
+
+    // Filter by subject and difficulty (post-query filtering for complex nested queries)
     let filteredTests = tests;
 
-    if (query.subject) {
+    if (subject && subject !== 'all') {
       filteredTests = filteredTests.filter((test) =>
-        test.sections?.some((section) => section.subject === query.subject)
+        test.sections?.some((section) => section.subject === subject)
       );
     }
 
-    if (query.difficulty) {
+    if (difficulty && difficulty !== 'all') {
       filteredTests = filteredTests.filter((test) =>
         test.sections?.some((section) =>
-          section.questions?.some((q) => q.difficulty === query.difficulty)
+          section.questions?.some((q) => q.difficulty === difficulty)
         )
       );
     }
 
+    // Calculate test statistics
     const testsWithCount = filteredTests.map((test) => {
       const testObj = test.toObject();
 
@@ -133,11 +182,19 @@ class TestService {
         Hard: 0,
       };
 
+      const subjectCount: Record<string, number> = {};
+
       if (testObj.sections) {
         for (const section of testObj.sections) {
           if (section.questions) {
             numberOfQuestions += section.questions.length;
 
+            // Count by subject
+            if (section.subject) {
+              subjectCount[section.subject] = (subjectCount[section.subject] || 0) + section.questions.length;
+            }
+
+            // Count by difficulty
             for (const question of section.questions) {
               if (question.difficulty) {
                 difficultyCount[question.difficulty] =
@@ -172,10 +229,37 @@ class TestService {
         ...testObj,
         numberOfQuestions,
         overallDifficulty,
+        subjectCount,
+        difficultyCount,
       };
     });
 
-    return testsWithCount;
+    // Calculate pagination metadata
+    const totalPages = Math.ceil(totalCount / limitNumber);
+    const hasNextPage = pageNumber < totalPages;
+    const hasPrevPage = pageNumber > 1;
+
+    return {
+      tests: testsWithCount,
+      pagination: {
+        currentPage: pageNumber,
+        totalPages,
+        totalCount,
+        limit: limitNumber,
+        hasNextPage,
+        hasPrevPage,
+      },
+      filters: {
+        search,
+        type,
+        examType,
+        subject,
+        difficulty,
+        sortBy,
+        sortOrder,
+        createdByRole
+      }
+    };
   };
 
   public getTestById = async (user: RequestUser, testId: string) => {

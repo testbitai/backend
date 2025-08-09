@@ -22,6 +22,7 @@ class AuthController {
   public login = async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { email, password } = req.body;
+      console.log(req.body)
       const result = await authService.loginUser(email, password);
       new ApiResponse(res, httpStatus.OK, "Login successful", result);
     } catch (error) {
