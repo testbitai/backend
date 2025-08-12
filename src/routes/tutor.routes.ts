@@ -64,7 +64,7 @@ const router = express.Router();
  *       200:
  *         description: Tutors retrieved successfully
  */
-router.get('/admin/tutors', getTutors);
+router.get('/', getTutors);
 
 /**
  * @swagger
@@ -76,7 +76,7 @@ router.get('/admin/tutors', getTutors);
  *       200:
  *         description: Statistics retrieved successfully
  */
-router.get('/admin/tutors/stats', getTutorStats);
+router.get('/stats', getTutorStats);
 
 /**
  * @swagger
@@ -97,7 +97,7 @@ router.get('/admin/tutors/stats', getTutorStats);
  *       404:
  *         description: Tutor not found
  */
-router.get('/admin/tutors/:tutorId', getTutor);
+router.get('/:tutorId', getTutor);
 
 /**
  * @swagger
@@ -130,7 +130,7 @@ router.get('/admin/tutors/:tutorId', getTutor);
  *       404:
  *         description: Tutor not found
  */
-router.patch('/admin/tutors/:tutorId/status', updateTutorStatus);
+router.patch('/:tutorId/status', updateTutorStatus);
 
 /**
  * @swagger
@@ -162,7 +162,7 @@ router.patch('/admin/tutors/:tutorId/status', updateTutorStatus);
  *       404:
  *         description: Tutor not found
  */
-router.patch('/admin/tutors/:tutorId/verify', verifyTutor);
+router.patch('/:tutorId/verify', verifyTutor);
 
 /**
  * @swagger
@@ -183,7 +183,7 @@ router.patch('/admin/tutors/:tutorId/verify', verifyTutor);
  *       404:
  *         description: Tutor not found
  */
-router.delete('/admin/tutors/:tutorId', deleteTutor);
+router.delete('/:tutorId', deleteTutor);
 
 /**
  * @swagger
@@ -221,7 +221,7 @@ router.delete('/admin/tutors/:tutorId', deleteTutor);
  *       404:
  *         description: Some tutors not found
  */
-router.post('/admin/tutors/notify', sendNotification);
+router.post('/notify', sendNotification);
 
 /**
  * @swagger
@@ -253,6 +253,6 @@ router.post('/admin/tutors/notify', sendNotification);
  *       400:
  *         description: Validation error
  */
-router.patch('/admin/tutors/bulk', bulkUpdateTutors);
+router.patch('/bulk', bulkUpdateTutors);
 
 export default router;
