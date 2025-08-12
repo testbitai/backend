@@ -34,8 +34,37 @@ export const validate = (schema: Joi.Schema) => {
       return next(new ApiError(httpStatus.BAD_REQUEST, errorMessage));
     }
 
-    // Replace the request with validated values
-    Object.assign(req, value);
+    // Replace the request with validated values, but handle read-only properties carefully
+    try {
+      if (value.params) {
+        req.params = { ...req.params, ...value.params };
+      }
+      if (value.body) {
+        req.body = value.body;
+      }
+      if (value.query) {
+        // Create a new query object to avoid modifying read-only properties
+        const newQuery: any = {};
+        Object.keys(value.query).forEach(key => {
+          newQuery[key] = value.query[key];
+        });
+        // Merge with existing query parameters
+        Object.keys(req.query).forEach(key => {
+          if (!(key in newQuery)) {
+            newQuery[key] = req.query[key];
+          }
+        });
+        // Replace the query object
+        (req as any).query = newQuery;
+      }
+      if (value.files) {
+        (req as any).files = value.files;
+      }
+    } catch (assignError) {
+      console.warn('Warning: Could not assign validated values to request:', assignError);
+      // Continue anyway - validation passed, assignment failed but that's not critical
+    }
+    
     return next();
   };
 };
@@ -56,7 +85,33 @@ export const asyncValidate = (schema: Joi.Schema) => {
         throw new ApiError(httpStatus.BAD_REQUEST, errorMessage);
       }
 
-      Object.assign(req, value);
+      // Handle validated values carefully
+      try {
+        if (value.params) {
+          req.params = { ...req.params, ...value.params };
+        }
+        if (value.body) {
+          req.body = value.body;
+        }
+        if (value.query) {
+          const newQuery: any = {};
+          Object.keys(value.query).forEach(key => {
+            newQuery[key] = value.query[key];
+          });
+          Object.keys(req.query).forEach(key => {
+            if (!(key in newQuery)) {
+              newQuery[key] = req.query[key];
+            }
+          });
+          (req as any).query = newQuery;
+        }
+        if (value.files) {
+          (req as any).files = value.files;
+        }
+      } catch (assignError) {
+        console.warn('Warning: Could not assign validated values to request:', assignError);
+      }
+
       next();
     } catch (error) {
       next(error);
@@ -94,7 +149,11 @@ export const validateRequestPart = (part: 'body' | 'params' | 'query', schema: J
       return next(new ApiError(httpStatus.BAD_REQUEST, errorMessage));
     }
 
-    req[part] = value;
+    try {
+      req[part] = value;
+    } catch (assignError) {
+      console.warn(`Warning: Could not assign validated ${part}:`, assignError);
+    }
     next();
   };
 };

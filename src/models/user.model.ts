@@ -57,6 +57,7 @@ export interface UserDocument extends Document {
   };
   examGoals: ExamGoal[];
   isEmailVerified: boolean;
+  isActive: boolean;
   coins: number;
   badges: Badge[];
   streak: Streak;
@@ -107,6 +108,7 @@ const userSchema: Schema<UserDocument> = new Schema(
       enum: Object.values(ExamGoal),
     }],
     isEmailVerified: { type: Boolean, default: false },
+    isActive: { type: Boolean, default: true },
     coins: { type: Number, default: 50 },
     badges: [{
       badgeId: { type: Schema.Types.ObjectId, ref: 'Badge' },
