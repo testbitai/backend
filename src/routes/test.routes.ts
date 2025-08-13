@@ -59,4 +59,11 @@ router.get(
   testController.getTestResultForTest
 );
 
+router.get(
+  "/ai-analysis/:testAttemptId",
+  authMiddleware.authenticate,
+  authMiddleware.authorizeRoles("student"),
+  testController.getAIAnalysis
+);
+
 export default router;

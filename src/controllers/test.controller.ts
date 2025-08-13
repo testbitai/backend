@@ -1,8 +1,12 @@
 import { Request, Response, NextFunction } from "express";
 import httpStatus from "http-status";
 import testService from "../services/test.service";
+// import aiAnalysisService from "../services/aiAnalysis.service";
+import aiAnalysisService from "../services/aiAnalysis.service.mock"; // Use mock service for testing
 import { ApiResponse } from "../utils/apiResponse";
 import { RequestWithUser } from "../interfaces/request.interface";
+import TestAttemptModel from "../models/testAttempt.model";
+import TestModel from "../models/test.model";
 
 class TestController {
   public createTest = async (
@@ -162,6 +166,71 @@ class TestController {
         result
       );
     } catch (error) {
+      next(error);
+    }
+  };
+
+  public getAIAnalysis = async (
+    req: RequestWithUser,
+    res: Response,
+    next: NextFunction
+  ) => {
+    try {
+      const { testAttemptId } = req.params;
+      if (!req.user || !req.user._id) {
+        return next(new Error("User not authenticated"));
+      }
+
+      // Fetch test attempt with populated test data
+      const testAttempt = await TestAttemptModel.findById(testAttemptId)
+        .populate('test')
+        .populate('user');
+
+      if (!testAttempt) {
+        new ApiResponse(
+          res,
+          httpStatus.NOT_FOUND,
+          "Test attempt not found"
+        );
+        return;
+      }
+
+
+      // Verify the test attempt belongs to the authenticated user
+      if (testAttempt.user._id.toString() !== req.user._id.toString()) {
+        new ApiResponse(
+          res,
+          httpStatus.FORBIDDEN,
+          "Access denied to this test attempt"
+        );
+        return;
+      }
+
+      // Get the full test document
+      const test = await TestModel.findById(testAttempt.test);
+      if (!test) {
+        new ApiResponse(
+          res,
+          httpStatus.NOT_FOUND,
+          "Test not found"
+        );
+        return;
+      }
+
+      // Generate AI analysis
+      const aiAnalysis = await aiAnalysisService.generateDetailedAnalysis(
+        testAttempt,
+        test
+      );
+
+      new ApiResponse(
+        res,
+        httpStatus.OK,
+        "AI analysis generated successfully",
+        aiAnalysis
+      );
+    } catch (error) {
+      console.error('AI Analysis Error:', error);
       next(error);
     }
   };
