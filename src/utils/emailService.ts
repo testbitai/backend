@@ -4,8 +4,8 @@ import config from "../config/config";
 const transporter = nodemailer.createTransport({
   service: "gmail",
   auth: {
-    user: "zashadu404@gmail.com",
-    pass: "dljh munf kjdj ujqr",
+    user: config.email.user,
+    pass: config.email.password,
   },
   port: 465,
   host: "smtp.gmail.com",
@@ -22,7 +22,7 @@ export const sendEmail = async (
 ): Promise<void> => {
   try {
     await transporter.sendMail({
-      from: '"TestBit" <zashadu404@gmail.com>',
+      from: `TestBit" <${config.email.user}>`,
       to,
       subject,
       html,

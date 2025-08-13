@@ -4,8 +4,8 @@ import config from "../config/config";
 const transporter = nodemailer.createTransport({
   service: "gmail",
   auth: {
-    user: "crezytechy@gmail.com",
-    pass: "vvmyhpfkiyxgakld",
+    user: config.email.user,
+    pass: config.email.password,
   },
   port: 465,
   host: "smtp.gamil.com",
