@@ -9,7 +9,7 @@ const server = http.createServer(app);
 
 // Start Server
 connectDB();
-const PORT = config.PORT || 5000;
+const PORT = process.env.PORT || 5001;
 server.listen(PORT, () => {
   logger.info(`🚀 Server running on http://localhost:${PORT}`);
 });

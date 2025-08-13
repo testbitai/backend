@@ -11,7 +11,10 @@ const authenticate = async (req: RequestWithUser, res: Response, next: NextFunct
     const token = req.headers.authorization?.split(' ')[1];
     if (!token) throw new ApiError(httpStatus.UNAUTHORIZED, 'Authentication required');
 
+    console.log(token)
+
     const payload = jwt.verify(token, config.jwt.secret) as { userId: string };
+    console.log(payload)
     const user = await User.findById(payload.userId);
     if (!user) throw new ApiError(httpStatus.NOT_FOUND, 'User not found');
 

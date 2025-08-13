@@ -1,14 +1,6 @@
 import express from 'express';
-import {
-  getTutors,
-  getTutorStats,
-  getTutor,
-  updateTutorStatus,
-  verifyTutor,
-  deleteTutor,
-  sendNotification,
-  bulkUpdateTutors,
-} from '../controllers/tutor.controller';
+import tutorController from '../controllers/tutor.controller';
+import authMiddleware from '../middlewares/auth.middleware';
 
 const router = express.Router();
 
@@ -18,6 +10,8 @@ const router = express.Router();
  *   get:
  *     summary: Get all tutors with filtering and pagination
  *     tags: [Admin - Tutors]
+ *     security:
+ *       - bearerAuth: []
  *     parameters:
  *       - in: query
  *         name: page
@@ -43,9 +37,9 @@ const router = express.Router();
  *         name: status
  *         schema:
  *           type: string
- *           enum: [all, active, inactive]
+ *           enum: [active, inactive, pending, cancelled]
  *           default: all
- *         description: Filter by status (based on isEmailVerified)
+ *         description: Filter by subscription status
  *       - in: query
  *         name: sortBy
  *         schema:
@@ -63,8 +57,17 @@ const router = express.Router();
  *     responses:
  *       200:
  *         description: Tutors retrieved successfully
+ *       401:
+ *         description: Unauthorized
+ *       403:
+ *         description: Forbidden
  */
-router.get('/', getTutors);
+
+router.get('/', 
+  authMiddleware.authenticate,
+  authMiddleware.authorizeRoles('admin'),
+  tutorController.getAllTutors
+);
 
 /**
  * @swagger
@@ -72,11 +75,21 @@ router.get('/', getTutors);
  *   get:
  *     summary: Get tutor statistics
  *     tags: [Admin - Tutors]
+ *     security:
+ *       - bearerAuth: []
  *     responses:
  *       200:
- *         description: Statistics retrieved successfully
+ *         description: Tutor statistics retrieved successfully
+ *       401:
+ *         description: Unauthorized
+ *       403:
+ *         description: Forbidden
  */
-router.get('/stats', getTutorStats);
+router.get('/stats', 
+  authMiddleware.authenticate,
+  authMiddleware.authorizeRoles('admin'),
+  tutorController.getTutorStats
+);
 
 /**
  * @swagger
@@ -84,6 +97,8 @@ router.get('/stats', getTutorStats);
  *   get:
  *     summary: Get tutor by ID
  *     tags: [Admin - Tutors]
+ *     security:
+ *       - bearerAuth: []
  *     parameters:
  *       - in: path
  *         name: tutorId
@@ -94,43 +109,18 @@ router.get('/stats', getTutorStats);
  *     responses:
  *       200:
  *         description: Tutor retrieved successfully
+ *       401:
+ *         description: Unauthorized
+ *       403:
+ *         description: Forbidden
  *       404:
  *         description: Tutor not found
  */
-router.get('/:tutorId', getTutor);
-
-/**
- * @swagger
- * /api/v1/admin/tutors/{tutorId}/status:
- *   patch:
- *     summary: Update tutor status (email verification)
- *     tags: [Admin - Tutors]
- *     parameters:
- *       - in: path
- *         name: tutorId
- *         required: true
- *         schema:
- *           type: string
- *         description: Tutor ID
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required:
- *               - status
- *             properties:
- *               status:
- *                 type: string
- *                 enum: [active, inactive]
- *     responses:
- *       200:
- *         description: Status updated successfully
- *       404:
- *         description: Tutor not found
- */
-router.patch('/:tutorId/status', updateTutorStatus);
+router.get('/:tutorId', 
+  authMiddleware.authenticate,
+  authMiddleware.authorizeRoles('admin'),
+  tutorController.getTutorById
+);
 
 /**
  * @swagger
@@ -138,6 +128,8 @@ router.patch('/:tutorId/status', updateTutorStatus);
  *   patch:
  *     summary: Update tutor verification status
  *     tags: [Admin - Tutors]
+ *     security:
+ *       - bearerAuth: []
  *     parameters:
  *       - in: path
  *         name: tutorId
@@ -159,17 +151,27 @@ router.patch('/:tutorId/status', updateTutorStatus);
  *     responses:
  *       200:
  *         description: Verification status updated successfully
+ *       401:
+ *         description: Unauthorized
+ *       403:
+ *         description: Forbidden
  *       404:
  *         description: Tutor not found
  */
-router.patch('/:tutorId/verify', verifyTutor);
+router.patch('/:tutorId/verify', 
+  authMiddleware.authenticate,
+  authMiddleware.authorizeRoles('admin'),
+  tutorController.verifyTutor
+);
 
 /**
  * @swagger
- * /api/v1/admin/tutors/{tutorId}:
- *   delete:
- *     summary: Delete tutor
+ * /api/v1/admin/tutors/{tutorId}/subscription:
+ *   patch:
+ *     summary: Update tutor subscription status
  *     tags: [Admin - Tutors]
+ *     security:
+ *       - bearerAuth: []
  *     parameters:
  *       - in: path
  *         name: tutorId
@@ -177,82 +179,34 @@ router.patch('/:tutorId/verify', verifyTutor);
  *         schema:
  *           type: string
  *         description: Tutor ID
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - status
+ *             properties:
+ *               status:
+ *                 type: string
+ *                 enum: [active, inactive, pending, cancelled]
+ *               paymentId:
+ *                 type: string
  *     responses:
  *       200:
- *         description: Tutor deleted successfully
+ *         description: Subscription status updated successfully
+ *       401:
+ *         description: Unauthorized
+ *       403:
+ *         description: Forbidden
  *       404:
  *         description: Tutor not found
  */
-router.delete('/:tutorId', deleteTutor);
-
-/**
- * @swagger
- * /api/v1/admin/tutors/notify:
- *   post:
- *     summary: Send notification to multiple tutors
- *     tags: [Admin - Tutors]
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required:
- *               - tutorIds
- *               - subject
- *               - message
- *             properties:
- *               tutorIds:
- *                 type: array
- *                 items:
- *                   type: string
- *                 description: Array of tutor IDs
- *               subject:
- *                 type: string
- *                 description: Notification subject
- *               message:
- *                 type: string
- *                 description: Notification message
- *     responses:
- *       200:
- *         description: Notification sent successfully
- *       400:
- *         description: Validation error
- *       404:
- *         description: Some tutors not found
- */
-router.post('/notify', sendNotification);
-
-/**
- * @swagger
- * /api/v1/admin/tutors/bulk:
- *   patch:
- *     summary: Bulk update tutors
- *     tags: [Admin - Tutors]
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required:
- *               - tutorIds
- *               - updateData
- *             properties:
- *               tutorIds:
- *                 type: array
- *                 items:
- *                   type: string
- *                 description: Array of tutor IDs
- *               updateData:
- *                 type: object
- *                 description: Data to update
- *     responses:
- *       200:
- *         description: Tutors updated successfully
- *       400:
- *         description: Validation error
- */
-router.patch('/bulk', bulkUpdateTutors);
+router.patch('/:tutorId/subscription', 
+  authMiddleware.authenticate,
+  authMiddleware.authorizeRoles('admin'),
+  tutorController.updateSubscription
+);
 
 export default router;

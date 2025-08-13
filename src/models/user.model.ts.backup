@@ -37,47 +37,11 @@ interface InviteCode {
   expiresAt: Date;
 }
 
-interface Address {
-  street: string;
-  city: string;
-  state: string;
-  pincode: string;
-}
-
 interface TutorDetails {
-  // Basic Info
-  instituteName?: string;
-  bio?: string;
-  experience?: number; // years of experience
-  qualifications?: string;
-  subjects?: string[]; // Physics, Chemistry, Mathematics
-  
-  // Contact Info
-  phone?: string;
-  address?: Address;
-  
-  // Plan & Payment
-  planType?: 'starter' | 'pro';
   paymentId?: string;
-  subscriptionStatus?: 'active' | 'inactive' | 'pending' | 'cancelled';
-  subscriptionStartDate?: Date;
-  subscriptionEndDate?: Date;
-  
-  // Teaching Details
   examFocus?: ExamGoal[];
   students?: mongoose.Types.ObjectId[];
   inviteCodes?: InviteCode[];
-  
-  // Verification
-  isProfileComplete?: boolean;
-  isVerified?: boolean;
-  verificationDocuments?: string[];
-  
-  // Stats
-  totalStudents?: number;
-  totalTests?: number;
-  rating?: number;
-  reviews?: mongoose.Types.ObjectId[];
 }
 
 export interface UserDocument extends Document {
@@ -155,34 +119,7 @@ const userSchema: Schema<UserDocument> = new Schema(
       lastActive: { type: Date },
     },
     tutorDetails: {
-      // Basic Info
-      instituteName: String,
-      bio: String,
-      experience: { type: Number, min: 0, max: 50 },
-      qualifications: String,
-      subjects: [{ type: String, enum: ['Physics', 'Chemistry', 'Mathematics'] }],
-      
-      // Contact Info
-      phone: { type: String, required: true},
-      address: {
-        street: String,
-        city: String,
-        state: String,
-        pincode: { type: String, match: /^\d{6}$/ },
-      },
-      
-      // Plan & Payment
-      planType: { type: String, enum: ['starter', 'pro'] },
       paymentId: String,
-      subscriptionStatus: { 
-        type: String, 
-        enum: ['active', 'inactive', 'pending', 'cancelled'],
-        default: 'pending'
-      },
-      subscriptionStartDate: Date,
-      subscriptionEndDate: Date,
-      
-      // Teaching Details
       examFocus: [{ type: String, enum: Object.values(ExamGoal) }],
       students: [{ type: Schema.Types.ObjectId, ref: 'User' }],
       inviteCodes: [{
@@ -190,17 +127,6 @@ const userSchema: Schema<UserDocument> = new Schema(
         password: String,
         expiresAt: Date,
       }],
-      
-      // Verification
-      isProfileComplete: { type: Boolean, default: false },
-      isVerified: { type: Boolean, default: false },
-      verificationDocuments: [String],
-      
-      // Stats
-      totalStudents: { type: Number, default: 0 },
-      totalTests: { type: Number, default: 0 },
-      rating: { type: Number, min: 0, max: 5, default: 0 },
-      reviews: [{ type: Schema.Types.ObjectId, ref: 'Review' }],
     },
   },
   {
@@ -219,8 +145,6 @@ const userSchema: Schema<UserDocument> = new Schema(
 userSchema.index({ email: 1 }, { unique: true });
 userSchema.index({ role: 1 });
 userSchema.index({ 'tutorDetails.students': 1 });
-userSchema.index({ 'tutorDetails.examFocus': 1 });
-userSchema.index({ 'tutorDetails.subjects': 1 });
 
 // ========== PRE-SAVE HOOKS ========== //
 

@@ -11,5 +11,6 @@ router.use('/contact', require("./contact.routes").default)
 router.use('/admin/students', require("./student.routes").default)
 router.use('/admin/tutors', require("./tutor.routes").default)
 router.use('/admin/rewards', require("./reward.routes").default)
+router.use('/tutor', require("./tutorAuth.routes").default)
 
 export default router;
