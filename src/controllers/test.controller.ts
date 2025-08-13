@@ -101,6 +101,28 @@ class TestController {
     }
   };
 
+  public toggleTestPublication = async (
+    req: RequestWithUser,
+    res: Response,
+    next: NextFunction
+  ) => {
+    try {
+      const result = await testService.toggleTestPublication(
+        req.user!,
+        req.params.id,
+        req.body.isPublished
+      );
+      new ApiResponse(
+        res,
+        httpStatus.OK,
+        "Test publication status updated successfully",
+        result
+      );
+    } catch (error) {
+      next(error);
+    }
+  };
+
   public getTestHistory = async (
     req: RequestWithUser,
     res: Response,

@@ -163,7 +163,7 @@ const userSchema: Schema<UserDocument> = new Schema(
       subjects: [{ type: String, enum: ['Physics', 'Chemistry', 'Mathematics'] }],
       
       // Contact Info
-      phone: { type: String, required: true},
+      phone: { type: String},
       address: {
         street: String,
         city: String,

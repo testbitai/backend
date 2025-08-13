@@ -29,6 +29,13 @@ router.delete(
   testController.deleteTest
 );
 
+router.patch(
+  "/:id/publish",
+  authMiddleware.authenticate,
+  authMiddleware.authorizeRoles("admin", "tutor"),
+  testController.toggleTestPublication
+);
+
 router.get("/", authMiddleware.authenticate, testController.getTests);
 
 router.get("/:id", authMiddleware.authenticate, testController.getTestById);

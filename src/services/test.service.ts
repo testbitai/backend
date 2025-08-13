@@ -81,6 +81,28 @@ class TestService {
     await test.deleteOne();
   };
 
+  public toggleTestPublication = async (user: RequestUser, testId: string, isPublished: boolean) => {
+    const test = await TestModel.findById(testId);
+
+    if (!test) {
+      throw new ApiError(httpStatus.NOT_FOUND, "Test not found");
+    }
+
+    // Check if user has permission to modify this test
+    if (
+      user.role === "tutor" &&
+      (!test.createdBy.equals(user._id) || test.createdByRole !== "tutor")
+    ) {
+      throw new ApiError(httpStatus.FORBIDDEN, "You cannot modify this test");
+    }
+
+    // Update publication status
+    test.isPublished = isPublished;
+    await test.save();
+
+    return test;
+  };
+
   public getTests = async (user: RequestUser, query: any) => {
     const {
       page = 1,
@@ -96,10 +118,11 @@ class TestService {
     } = query;
 
     // Base filter
-    const filter: any = { isPublished: true };
+    const filter: any = {};
 
     // Role-based filtering
     if (user.role === "student") {
+      filter.isPublished = true;
       filter.$or = [
         { createdByRole: "admin" },
         { createdByRole: "tutor", allowedStudents: user._id },
@@ -109,8 +132,8 @@ class TestService {
       if (createdByRole && createdByRole !== 'all') {
         filter.createdByRole = createdByRole;
       }
-    } else {
-      // For tutor, fetch only tests created by them
+    } else if (user.role === "tutor") {
+      // For tutor, fetch only tests created by them (both published and unpublished)
       filter.createdBy = user._id;
       filter.createdByRole = user.role;
     }
