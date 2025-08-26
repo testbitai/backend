@@ -1,8 +1,9 @@
 import { Request, Response, NextFunction } from "express";
 import httpStatus from "http-status";
 import testService from "../services/test.service";
-// import aiAnalysisService from "../services/aiAnalysis.service";
-import aiAnalysisService from "../services/aiAnalysis.service.mock"; // Use mock service for testing
+// import aiAnalysisService from "../services/aiAnalysis.service"; // Real OpenAI service
+// import aiAnalysisService from "../services/aiAnalysis.service.mock"; // Original mock service
+import aiAnalysisService from "../services/aiAnalysis.service.mock.improved"; // Improved mock service with better topic categorization
 import { ApiResponse } from "../utils/apiResponse";
 import { RequestWithUser } from "../interfaces/request.interface";
 import TestAttemptModel from "../models/testAttempt.model";
