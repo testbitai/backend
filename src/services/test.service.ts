@@ -395,6 +395,19 @@ class TestService {
       throw new ApiError(httpStatus.NOT_FOUND, "Test not found");
     }
 
+    // Check attempt limit (max 3 attempts per test)
+    const existingAttempts = await TestAttemptModel.countDocuments({
+      user: user._id,
+      test: testId,
+    });
+
+    if (existingAttempts >= 3) {
+      throw new ApiError(
+        httpStatus.BAD_REQUEST,
+        "Maximum attempt limit reached. You can only attempt this test 3 times."
+      );
+    }
+
     // Check access if test is from tutor
     if (test.createdByRole === "tutor") {
       const allowed = test.allowedStudents?.some(
@@ -590,6 +603,25 @@ class TestService {
       .sort({ attemptedAt: -1 });
 
     return history;
+  };
+
+  public getTestAttemptCount = async (userId: string, testId: string) => {
+    const count = await TestAttemptModel.countDocuments({
+      user: userId,
+      test: testId,
+    });
+    return count;
+  };
+
+  public getAllTestAttempts = async (userId: string, testId: string) => {
+    const attempts = await TestAttemptModel.find({
+      user: userId,
+      test: testId,
+    })
+      .populate("test", "title description examType type duration")
+      .sort({ attemptedAt: 1 }); // oldest first
+
+    return attempts;
   };
 
   public async getTestResultForTest(userId: string, testId: string) {

@@ -235,6 +235,56 @@ class TestController {
       next(error);
     }
   };
+
+  public getTestAttemptCount = async (
+    req: RequestWithUser,
+    res: Response,
+    next: NextFunction
+  ) => {
+    try {
+      const { testId } = req.params;
+      if (!req.user || !req.user._id) {
+        return next(new Error("User not authenticated"));
+      }
+      const userId = req.user._id;
+
+      const count = await testService.getTestAttemptCount(userId, testId);
+
+      new ApiResponse(
+        res,
+        httpStatus.OK,
+        "Attempt count fetched successfully",
+        { count, maxAttempts: 3, remainingAttempts: Math.max(0, 3 - count) }
+      );
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  public getAllTestAttempts = async (
+    req: RequestWithUser,
+    res: Response,
+    next: NextFunction
+  ) => {
+    try {
+      const { testId } = req.params;
+      if (!req.user || !req.user._id) {
+        return next(new Error("User not authenticated"));
+      }
+      const userId = req.user._id;
+
+      const attempts = await testService.getAllTestAttempts(userId, testId);
+
+      new ApiResponse(
+        res,
+        httpStatus.OK,
+        "All test attempts fetched successfully",
+        attempts
+      );
+    } catch (error) {
+      next(error);
+    }
+  };
 }
 
 export default new TestController();

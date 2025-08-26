@@ -66,4 +66,18 @@ router.get(
   testController.getAIAnalysis
 );
 
+router.get(
+  "/:testId/attempt-count",
+  authMiddleware.authenticate,
+  authMiddleware.authorizeRoles("student"),
+  testController.getTestAttemptCount
+);
+
+router.get(
+  "/:testId/all-attempts",
+  authMiddleware.authenticate,
+  authMiddleware.authorizeRoles("student"),
+  testController.getAllTestAttempts
+);
+
 export default router;
