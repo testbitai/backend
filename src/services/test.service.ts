@@ -401,7 +401,7 @@ class TestService {
       test: testId,
     });
 
-    if (existingAttempts >= 3) {
+    if (existingAttempts >= 100) {
       throw new ApiError(
         httpStatus.BAD_REQUEST,
         "Maximum attempt limit reached. You can only attempt this test 3 times."
