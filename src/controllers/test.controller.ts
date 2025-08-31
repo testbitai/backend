@@ -254,7 +254,7 @@ class TestController {
         res,
         httpStatus.OK,
         "Attempt count fetched successfully",
-        { count, maxAttempts: 3, remainingAttempts: Math.max(0, 3 - count) }
+        { count, maxAttempts: 100, remainingAttempts: Math.max(0, 100 - count) }
       );
     } catch (error) {
       next(error);
