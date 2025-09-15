@@ -1,4 +1,4 @@
-import { TestAttemptDocument, AttemptedQuestion, SubjectAnalytics } from '../models/testAttempt.model';
+import { TestAttemptDocument } from '../models/testAttempt.model';
 import { TestDocument, Question } from '../models/test.model';
 
 export interface TopicAnalysis {
@@ -48,29 +48,26 @@ export interface DetailedAIAnalysis {
   };
 }
 
-class ImprovedMockAIAnalysisService {
+class MockAIAnalysisService {
   /**
-   * Generate mock detailed analysis with improved topic categorization
+   * Generate mock detailed analysis with  topic categorization
    */
   async generateDetailedAnalysis(
     testAttempt: TestAttemptDocument,
     test: TestDocument
   ): Promise<DetailedAIAnalysis> {
     try {
-      // Simulate processing delay
-      await new Promise(resolve => setTimeout(resolve, 1000));
-
-      // Generate improved topic analysis based on actual question content
-      const topicAnalysis = this.generateImprovedTopicAnalysis(testAttempt, test);
+      // Generate  topic analysis based on actual question content
+      const topicAnalysis = this.generateTopicAnalysis(testAttempt, test);
       
       // Generate mock recommendations
-      const recommendations = this.generateImprovedRecommendations(testAttempt, topicAnalysis);
+      const recommendations = this.generateRecommendations(testAttempt, topicAnalysis);
       
       // Generate mock study plan
-      const studyPlan = this.generateImprovedStudyPlan(topicAnalysis);
+      const studyPlan = this.generateStudyPlan(topicAnalysis);
       
       // Generate mock conceptual insights
-      const conceptualInsights = this.generateImprovedConceptualInsights(topicAnalysis);
+      const conceptualInsights = this.generateConceptualInsights(topicAnalysis);
       
       // Generate mock time management analysis
       const timeManagementAnalysis = this.generateMockTimeManagementAnalysis(testAttempt);
@@ -89,15 +86,15 @@ class ImprovedMockAIAnalysisService {
         timeManagementAnalysis
       };
     } catch (error) {
-      console.error('Error generating improved mock analysis:', error);
+      console.error('Error generating  mock analysis:', error);
       throw new Error('Failed to generate AI analysis');
     }
   }
 
   /**
-   * Improved topic analysis that properly categorizes questions by content
+   *  topic analysis that properly categorizes questions by content
    */
-  private generateImprovedTopicAnalysis(
+  private generateTopicAnalysis(
     testAttempt: TestAttemptDocument,
     test: TestDocument
   ): TopicAnalysis[] {
@@ -155,13 +152,13 @@ class ImprovedMockAIAnalysisService {
   }
 
   /**
-   * Improved question categorization based on content analysis
+   *  question categorization based on content analysis
    */
   private categorizeQuestion(question: Question, subject: string): string {
     const questionText = question.questionText.toLowerCase();
     
     if (subject.toLowerCase().includes('math')) {
-      // Improved math categorization with specific pattern matching
+      //  math categorization with specific pattern matching
       
       // Basic Arithmetic - Simple operations with numbers
       if (/^\s*\d+\s*[+\-×*÷/]\s*\d+/.test(questionText) || 
@@ -312,9 +309,9 @@ class ImprovedMockAIAnalysisService {
   }
 
   /**
-   * Generate improved recommendations based on specific topics
+   * Generate  recommendations based on specific topics
    */
-  private generateImprovedRecommendations(
+  private generateRecommendations(
     testAttempt: TestAttemptDocument,
     topicAnalysis: TopicAnalysis[]
   ): AIRecommendation[] {
@@ -470,9 +467,9 @@ class ImprovedMockAIAnalysisService {
   }
 
   /**
-   * Generate improved study plan based on specific topics
+   * Generate  study plan based on specific topics
    */
-  private generateImprovedStudyPlan(topicAnalysis: TopicAnalysis[]): DetailedAIAnalysis['studyPlan'] {
+  private generateStudyPlan(topicAnalysis: TopicAnalysis[]): DetailedAIAnalysis['studyPlan'] {
     const weakTopics = topicAnalysis.filter(t => t.accuracy < 60);
     const immediate: string[] = [];
     const shortTerm: string[] = [];
@@ -537,9 +534,9 @@ class ImprovedMockAIAnalysisService {
   }
 
   /**
-   * Generate improved conceptual insights
+   * Generate  conceptual insights
    */
-  private generateImprovedConceptualInsights(topicAnalysis: TopicAnalysis[]): DetailedAIAnalysis['conceptualInsights'] {
+  private generateConceptualInsights(topicAnalysis: TopicAnalysis[]): DetailedAIAnalysis['conceptualInsights'] {
     const masteredConcepts = topicAnalysis
       .filter(t => t.accuracy >= 85)
       .map(t => t.topic);
@@ -659,4 +656,4 @@ class ImprovedMockAIAnalysisService {
   }
 }
 
-export default new ImprovedMockAIAnalysisService();
+export default new MockAIAnalysisService();
