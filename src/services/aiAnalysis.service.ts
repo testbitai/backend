@@ -117,7 +117,7 @@ class ImprovedAIAnalysisService {
 
     try {
       const response = await openai.chat.completions.create({
-        model: "gpt-4o",
+        model: "gpt-4o-mini",
         messages: [{ role: "user", content: prompt }],
         temperature: 0.1, // Lower temperature for more consistent categorization
         max_tokens: 1000,
@@ -329,7 +329,7 @@ class ImprovedAIAnalysisService {
 
     try {
       const response = await openai.chat.completions.create({
-        model: "gpt-4o",
+        model: "gpt-4o-mini",
         messages: [{ role: "user", content: prompt }],
         temperature: 0.7,
         max_tokens: 2000,
@@ -436,7 +436,7 @@ class ImprovedAIAnalysisService {
 
     try {
       const response = await openai.chat.completions.create({
-        model: "gpt-4o",
+        model: "gpt-4o-mini",
         messages: [{ role: "user", content: prompt }],
         temperature: 0.6,
         max_tokens: 1000,
