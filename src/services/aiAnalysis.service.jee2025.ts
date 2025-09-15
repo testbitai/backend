@@ -1,7 +1,10 @@
-import OpenAI from 'openai';
-import { JEE_SYLLABUS_2025, getTopicFromSyllabus } from '../config/jee-syllabus-2025';
-import { TestAttemptDocument } from '../models/testAttempt.model';
-import { TestDocument, Question } from '../models/test.model';
+import OpenAI from "openai";
+import {
+  JEE_SYLLABUS_2025,
+  getTopicFromSyllabus,
+} from "../config/jee-syllabus-2025";
+import { TestAttemptDocument } from "../models/testAttempt.model";
+import { TestDocument, Question } from "../models/test.model";
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
@@ -14,23 +17,25 @@ export interface JEETopicAnalysis {
   questionsAttempted: number;
   correctAnswers: number;
   accuracy: number;
-  syllabusAlignment: 'High' | 'Medium' | 'Low';
+  syllabusAlignment: "High" | "Medium" | "Low";
   recommendedStudyTime: number; // hours
 }
 
 class JEE2025AIAnalysisService {
-  
-  async extractJEETopics(questions: Question[], subject: string): Promise<{ [questionIndex: number]: string }> {
+  async extractJEETopics(
+    questions: Question[],
+    subject: string
+  ): Promise<{ [questionIndex: number]: string }> {
     const syllabusTopics = this.getSyllabusTopics(subject);
-    
+
     const prompt = `
     Analyze each ${subject} question and map to JEE Main 2025 syllabus topics.
     
     Available topics for ${subject}:
-    ${syllabusTopics.join(', ')}
+    ${syllabusTopics.join(", ")}
     
     Questions:
-    ${questions.map((q, i) => `${i}: ${q.questionText}`).join('\n')}
+    ${questions.map((q, i) => `${i}: ${q.questionText}`).join("\n")}
     
     Return JSON mapping question index to exact syllabus topic:
     { "0": "Projectile Motion", "1": "Chemical Bonding" }
@@ -53,34 +58,44 @@ class JEE2025AIAnalysisService {
       }
       return this.fallbackTopicMapping(questions, subject);
     } catch (error) {
-      console.error('AI topic extraction failed:', error);
+      console.error("AI topic extraction failed:", error);
       return this.fallbackTopicMapping(questions, subject);
     }
   }
 
   private getSyllabusTopics(subject: string): string[] {
-    const syllabusData = JEE_SYLLABUS_2025[subject.toUpperCase() as keyof typeof JEE_SYLLABUS_2025];
+    const syllabusData =
+      JEE_SYLLABUS_2025[
+        subject.toUpperCase() as keyof typeof JEE_SYLLABUS_2025
+      ];
     if (!syllabusData) return [];
-    
-    return Object.values(syllabusData).flatMap(unit => unit.topics);
+
+    return Object.values(syllabusData).flatMap((unit) => unit.topics);
   }
 
-  private fallbackTopicMapping(questions: Question[], subject: string): { [questionIndex: number]: string } {
+  private fallbackTopicMapping(
+    questions: Question[],
+    subject: string
+  ): { [questionIndex: number]: string } {
     const result: { [questionIndex: number]: string } = {};
-    
+
     questions.forEach((question, index) => {
       result[index] = getTopicFromSyllabus(question.questionText, subject);
     });
-    
+
     return result;
   }
 
-  async generateJEERecommendations(topicAnalysis: JEETopicAnalysis[]): Promise<any[]> {
-    const weakTopics = topicAnalysis.filter(t => t.accuracy < 60);
-    
+  async generateJEERecommendations(
+    topicAnalysis: JEETopicAnalysis[]
+  ): Promise<any[]> {
+    const weakTopics = topicAnalysis.filter((t) => t.accuracy < 60);
+
     const prompt = `
     Generate JEE Main 2025 specific study recommendations for weak topics:
-    ${weakTopics.map(t => `${t.topic} (${t.subject}) - ${t.accuracy}% accuracy`).join('\n')}
+    ${weakTopics
+      .map((t) => `${t.topic} (${t.subject}) - ${t.accuracy}% accuracy`)
+      .join("\n")}
     
     Provide JEE-specific study strategies, recommended books, and practice methods.
     Focus on JEE Main exam pattern and difficulty level.
@@ -90,7 +105,7 @@ class JEE2025AIAnalysisService {
 
     try {
       const response = await openai.chat.completions.create({
-        model: "gpt-4o", 
+        model: "gpt-4o",
         messages: [{ role: "user", content: prompt }],
         temperature: 0.7,
         max_tokens: 1500,
@@ -107,8 +122,8 @@ class JEE2025AIAnalysisService {
   }
 
   private generateFallbackJEERecommendations(weakTopics: JEETopicAnalysis[]) {
-    return weakTopics.map(topic => ({
-      type: 'weakness',
+    return weakTopics.map((topic) => ({
+      type: "weakness",
       subject: topic.subject,
       topic: topic.topic,
       title: `Master ${topic.topic} for JEE Main`,
@@ -117,20 +132,26 @@ class JEE2025AIAnalysisService {
         `Study ${topic.topic} from NCERT textbook`,
         `Solve previous year JEE Main questions on ${topic.topic}`,
         `Practice mock tests focusing on ${topic.topic}`,
-        `Review concepts daily for ${topic.recommendedStudyTime} hours`
+        `Review concepts daily for ${topic.recommendedStudyTime} hours`,
       ],
-      priority: topic.accuracy < 40 ? 'High' : 'Medium',
-      examRelevance: 'JEE Main 2025',
-      estimatedStudyTime: `${topic.recommendedStudyTime} hours/week`
+      priority: topic.accuracy < 40 ? "High" : "Medium",
+      examRelevance: "JEE Main 2025",
+      estimatedStudyTime: `${topic.recommendedStudyTime} hours/week`,
     }));
   }
 
-  async analyzeJEEPerformance(testAttempt: TestAttemptDocument, test: TestDocument) {
+  async analyzeJEEPerformance(
+    testAttempt: TestAttemptDocument,
+    test: TestDocument
+  ) {
     const topicAnalysis: JEETopicAnalysis[] = [];
-    
+
     for (const section of test.sections) {
-      const questionTopicMap = await this.extractJEETopics(section.questions, section.subject);
-      
+      const questionTopicMap = await this.extractJEETopics(
+        section.questions,
+        section.subject
+      );
+
       // Group by topic and analyze
       const topicGroups: { [topic: string]: number[] } = {};
       Object.entries(questionTopicMap).forEach(([qIndex, topic]) => {
@@ -141,13 +162,17 @@ class JEE2025AIAnalysisService {
       Object.entries(topicGroups).forEach(([topic, questionIndices]) => {
         const sectionIndex = test.sections.indexOf(section);
         const topicQuestions = testAttempt.attemptedQuestions.filter(
-          aq => aq.sectionIndex === sectionIndex && questionIndices.includes(aq.questionIndex)
+          (aq) =>
+            aq.sectionIndex === sectionIndex &&
+            questionIndices.includes(aq.questionIndex)
         );
 
         if (topicQuestions.length > 0) {
-          const correctAnswers = topicQuestions.filter(q => q.isCorrect).length;
+          const correctAnswers = topicQuestions.filter(
+            (q) => q.isCorrect
+          ).length;
           const accuracy = (correctAnswers / topicQuestions.length) * 100;
-          
+
           topicAnalysis.push({
             unit: this.getUnitForTopic(topic, section.subject),
             topic,
@@ -155,52 +180,72 @@ class JEE2025AIAnalysisService {
             questionsAttempted: topicQuestions.length,
             correctAnswers,
             accuracy,
-            syllabusAlignment: this.getSyllabusAlignment(topic, section.subject),
-            recommendedStudyTime: this.calculateStudyTime(accuracy, topicQuestions.length)
+            syllabusAlignment: this.getSyllabusAlignment(
+              topic,
+              section.subject
+            ),
+            recommendedStudyTime: this.calculateStudyTime(
+              accuracy,
+              topicQuestions.length
+            ),
           });
         }
       });
     }
 
-    const recommendations = await this.generateJEERecommendations(topicAnalysis);
-    
+    const recommendations = await this.generateJEERecommendations(
+      topicAnalysis
+    );
+
     return {
       topicAnalysis,
       recommendations,
       examSpecific: {
-        examType: 'JEE Main 2025',
+        examType: "JEE Main 2025",
         syllabusCompliance: this.calculateSyllabusCompliance(topicAnalysis),
-        priorityTopics: topicAnalysis.filter(t => t.accuracy < 50).map(t => t.topic)
-      }
+        priorityTopics: topicAnalysis
+          .filter((t) => t.accuracy < 50)
+          .map((t) => t.topic),
+      },
     };
   }
 
   private getUnitForTopic(topic: string, subject: string): string {
-    const syllabusData = JEE_SYLLABUS_2025[subject.toUpperCase() as keyof typeof JEE_SYLLABUS_2025];
-    if (!syllabusData) return 'Unknown Unit';
-    
+    const syllabusData =
+      JEE_SYLLABUS_2025[
+        subject.toUpperCase() as keyof typeof JEE_SYLLABUS_2025
+      ];
+    if (!syllabusData) return "Unknown Unit";
+
     for (const [unitKey, unitData] of Object.entries(syllabusData)) {
       if (unitData.topics.includes(topic)) {
         return unitData.name;
       }
     }
-    return 'Unknown Unit';
+    return "Unknown Unit";
   }
 
-  private getSyllabusAlignment(topic: string, subject: string): 'High' | 'Medium' | 'Low' {
+  private getSyllabusAlignment(
+    topic: string,
+    subject: string
+  ): "High" | "Medium" | "Low" {
     const syllabusTopics = this.getSyllabusTopics(subject);
-    return syllabusTopics.includes(topic) ? 'High' : 'Low';
+    return syllabusTopics.includes(topic) ? "High" : "Low";
   }
 
   private calculateStudyTime(accuracy: number, questionCount: number): number {
     if (accuracy < 30) return 8; // 8 hours/week
-    if (accuracy < 60) return 5; // 5 hours/week  
+    if (accuracy < 60) return 5; // 5 hours/week
     if (accuracy < 80) return 3; // 3 hours/week
     return 1; // 1 hour/week for maintenance
   }
 
-  private calculateSyllabusCompliance(topicAnalysis: JEETopicAnalysis[]): number {
-    const highAlignment = topicAnalysis.filter(t => t.syllabusAlignment === 'High').length;
+  private calculateSyllabusCompliance(
+    topicAnalysis: JEETopicAnalysis[]
+  ): number {
+    const highAlignment = topicAnalysis.filter(
+      (t) => t.syllabusAlignment === "High"
+    ).length;
     return (highAlignment / topicAnalysis.length) * 100;
   }
 }

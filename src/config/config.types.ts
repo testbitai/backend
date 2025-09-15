@@ -21,8 +21,10 @@ export interface EmailConfig {
 }
 
 export interface AppConfig {
+  MONGODB_URI: string;
   env: string;
   jwt: JwtConfig;
   email: EmailConfig;
   clientUrl: string;
+  OPENAI_API_KEY: string;
 }
