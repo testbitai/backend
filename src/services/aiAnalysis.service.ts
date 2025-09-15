@@ -77,32 +77,73 @@ class ImprovedAIAnalysisService {
     const questionsList = questions.map((q, idx) => `${startIndex + idx}: ${q.questionText}`).join('\n\n');
     
     const prompt = `
-    Analyze the following ${subject} questions and categorize each question into the most specific and appropriate topic.
-    
-    For Mathematics/Math questions, be very specific about the level:
-    - Use "Basic Arithmetic" for simple addition, subtraction, multiplication, division (like 4+2, 10-3, 5×7)
-    - Use "Fractions" for fraction operations
-    - Use "Decimals" for decimal operations  
-    - Use "Percentages" for percentage calculations
-    - Use "Basic Algebra" for simple equations with one variable
-    - Use "Geometry" for shapes, area, perimeter questions
-    - Use "Advanced Algebra" only for complex algebraic expressions
-    - Use "Calculus" only for derivatives, integrals, limits
-    - Use "Trigonometry" only for sin, cos, tan functions
-    - Use "Statistics" for mean, median, mode, probability
-    
-    For Physics questions:
-    - Use "Mechanics" for motion, force, energy
-    - Use "Thermodynamics" for heat, temperature
-    - Use "Electromagnetism" for electricity, magnetism
-    - Use "Optics" for light, mirrors, lenses
-    - Use "Modern Physics" for quantum, relativity
-    
-    For Chemistry questions:
-    - Use "Basic Chemistry" for simple concepts
-    - Use "Organic Chemistry" for carbon compounds
-    - Use "Inorganic Chemistry" for non-organic compounds
-    - Use "Physical Chemistry" for thermodynamics, kinetics
+    For Mathematics questions, use the following topic labels:
+- Set Theory (Sets, Relations and Functions)
+- Complex Numbers & Quadratic Equations
+- Matrices & Determinants
+- Permutations & Combinations
+- Binomial Theorem
+- Sequences & Series
+- Limits, Continuity & Differentiability
+- Integral Calculus
+- Differential Equations
+- Coordinate Geometry
+- 3D Geometry
+- Vector Algebra
+- Statistics & Probability
+- Trigonometry
+
+For Physics questions, use the following topic labels:
+- Measurement (Units, Dimensions, Errors)
+- Kinematics
+- Laws of Motion
+- Work, Energy & Power
+- Rotational Motion
+- Gravitation
+- Properties of Solids & Liquids
+- Thermodynamics
+- Kinetic Theory of Gases
+- Oscillations & Waves
+- Electrostatics
+- Current Electricity
+- Magnetism (Magnetic Effects of Current & Magnetism)
+- Electromagnetic Induction & AC
+- Electromagnetic Waves
+- Optics
+- Dual Nature of Matter & Radiation
+- Atoms & Nuclei
+- Electronic Devices
+- Experimental Skills
+
+For Chemistry questions, use the following topic labels:
+
+-- Physical Chemistry --
+- Basic Concepts of Chemistry (Mole Concept, Stoichiometry)
+- Atomic Structure
+- Chemical Bonding & Molecular Structure
+- Thermodynamics
+- Solutions
+- Equilibrium
+- Redox Reactions & Electrochemistry
+- Chemical Kinetics
+
+-- Inorganic Chemistry --
+- Periodic Table & Periodicity
+- p-Block Elements
+- d-Block Elements
+- f-Block Elements
+- Coordination Compounds
+
+-- Organic Chemistry --
+- Purification & Characterisation of Organic Compounds
+- Basic Principles of Organic Chemistry
+- Hydrocarbons
+- Haloalkanes & Haloarenes
+- Alcohols, Phenols & Ethers
+- Aldehydes, Ketones & Carboxylic Acids
+- Amines & Diazonium Compounds
+- Biomolecules
+- Principles of Practical Organic Chemistry
     
     Questions:
     ${questionsList}
@@ -125,13 +166,18 @@ class ImprovedAIAnalysisService {
 
       const content = response.choices[0]?.message?.content;
       if (content) {
-        const parsed = JSON.parse(content);
-        // Convert string indices to numbers and adjust for batch offset
-        const result: { [questionIndex: number]: string } = {};
-        Object.entries(parsed).forEach(([idx, topic]) => {
-          result[startIndex + parseInt(idx)] = topic as string;
-        });
-        return result;
+        // Extract JSON from markdown code blocks if present
+        const jsonMatch = content.match(/```json\s*([\s\S]*?)\s*```/) || content.match(/\{[\s\S]*\}/);
+        if (jsonMatch) {
+          const jsonStr = jsonMatch[1] || jsonMatch[0];
+          const parsed = JSON.parse(jsonStr);
+          // Convert string indices to numbers and adjust for batch offset
+          const result: { [questionIndex: number]: string } = {};
+          Object.entries(parsed).forEach(([idx, topic]) => {
+            result[startIndex + parseInt(idx)] = topic as string;
+          });
+          return result;
+        }
       }
       return {};
     } catch (error) {
@@ -337,8 +383,13 @@ class ImprovedAIAnalysisService {
 
       const content = response.choices[0]?.message?.content;
       if (content) {
-        const parsed = JSON.parse(content);
-        return parsed.recommendations || [];
+        // Extract JSON from markdown code blocks if present
+        const jsonMatch = content.match(/```json\s*([\s\S]*?)\s*```/) || content.match(/\{[\s\S]*\}/);
+        if (jsonMatch) {
+          const jsonStr = jsonMatch[1] || jsonMatch[0];
+          const parsed = JSON.parse(jsonStr);
+          return parsed.recommendations || [];
+        }
       }
       return [];
     } catch (error) {
@@ -444,7 +495,12 @@ class ImprovedAIAnalysisService {
 
       const content = response.choices[0]?.message?.content;
       if (content) {
-        return JSON.parse(content);
+        // Extract JSON from markdown code blocks if present
+        const jsonMatch = content.match(/```json\s*([\s\S]*?)\s*```/) || content.match(/\{[\s\S]*\}/);
+        if (jsonMatch) {
+          const jsonStr = jsonMatch[1] || jsonMatch[0];
+          return JSON.parse(jsonStr);
+        }
       }
       return this.generateFallbackStudyPlan(weakTopics);
     } catch (error) {
