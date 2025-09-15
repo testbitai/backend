@@ -1,6 +1,7 @@
 import OpenAI from 'openai';
 import { TestAttemptDocument, AttemptedQuestion, SubjectAnalytics } from '../models/testAttempt.model';
 import { TestDocument, Question } from '../models/test.model';
+import AIAnalysisCache from '../models/aiAnalysisCache.model';
 import config from '../config/config';
 
 // Initialize OpenAI client
@@ -541,6 +542,18 @@ For Chemistry questions, use the following topic labels:
     test: TestDocument
   ): Promise<DetailedAIAnalysis> {
     try {
+      // Check if analysis already exists in cache
+      const cachedAnalysis = await AIAnalysisCache.findOne({ 
+        testAttemptId: testAttempt._id 
+      });
+      
+      if (cachedAnalysis) {
+        console.log('Returning cached AI analysis');
+        return cachedAnalysis.analysis;
+      }
+
+      console.log('Generating new AI analysis');
+      
       // Analyze topic-wise performance with improved categorization
       const topicAnalysis = await this.analyzeTopicPerformance(testAttempt, test);
       
@@ -556,7 +569,7 @@ For Chemistry questions, use the following topic labels:
       // Analyze time management
       const timeManagementAnalysis = this.analyzeTimeManagement(testAttempt);
       
-      return {
+      const analysis: DetailedAIAnalysis = {
         overallPerformance: {
           grade: this.calculateGrade(testAttempt.scorePercent),
           percentile: this.calculatePercentile(testAttempt.scorePercent),
@@ -569,6 +582,15 @@ For Chemistry questions, use the following topic labels:
         conceptualInsights,
         timeManagementAnalysis
       };
+
+      // Save analysis to cache
+      await AIAnalysisCache.create({
+        testAttemptId: testAttempt._id,
+        userId: testAttempt.user,
+        analysis
+      });
+
+      return analysis;
     } catch (error) {
       console.error('Error generating detailed analysis:', error);
       throw new Error('Failed to generate AI analysis');
